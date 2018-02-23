@@ -9,13 +9,21 @@ from tweepy import OAuthHandler
 import config
 
 
+class StreamListener(tweepy.StreamListener):
+    def on_status(self, status):
+        tw = TwitterAccount()
+        tw.write_to_file(f"{status.text}\n")
+
+    def on_error(self, status_code):
+        if status_code == 420:
+            return False
+
+
 class TwitterAccount():
     def __init__(self, user="wylsacom"):
         self.user = user
-        self.get_authorization()
-        self.get_tweets()
 
-    def get_authorization(self):
+    def get_api(self):
         try:
             self.consumer_key = config.consumer_key
             self.consumer_secret = config.consumer_secret
@@ -27,6 +35,7 @@ class TwitterAccount():
             self.api = tweepy.API(self.auth, wait_on_rate_limit_notify=True)
         except tweepy.TweepError as exception:
             logging.exception(exception)
+        return self.api
 
     def get_tweets(self):
         user_tweets = self.api.user_timeline(id=self.user, count=200, pages=10)
@@ -71,4 +80,9 @@ class TwitterAccount():
 
 
 if __name__ == '__main__':
-    TwitterAccount(user="wylsacom")
+    twitter = TwitterAccount(user="wylsacom")
+    api = twitter.get_api()
+
+    streamListener = StreamListener()
+    stream = tweepy.Stream(auth=api.auth, listener=streamListener)
+    stream.filter(follow=["284168384"])

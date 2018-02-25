@@ -15,5 +15,5 @@ pip install -r req.txt
 
 ### Use
 ```
-python3.6 tweeter_load_out.py --username=user
+python3.6 tweeter_load_out.py --username USERNAME
 ```

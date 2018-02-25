@@ -1,5 +1,6 @@
 import sys
 import re
+import argparse
 import time
 import logging
 
@@ -22,6 +23,11 @@ class StreamListener(tweepy.StreamListener):
 class TwitterAccount():
     def __init__(self, user="wylsacom"):
         self.user = user
+        self.num_of_tweets = 10
+        self.num_of_repl = 20
+        self.limit = 0
+        self.get_api()
+        self.get_tweets()
 
     def get_api(self):
         try:
@@ -38,40 +44,45 @@ class TwitterAccount():
         return self.api
 
     def get_tweets(self):
-        user_tweets = self.api.user_timeline(id=self.user, count=200, pages=10)
-        num_retrieved_tweets = 0
-        num_retrieved_tweets += len(user_tweets)
-        print(f"Счетчик твитов: {num_retrieved_tweets}")
+        user_tweets = self.api.user_timeline(id=self.user,
+                                             count=self.num_of_tweets,
+                                             pages=10)
+        self.limit += len(user_tweets)
 
-        for tweet in user_tweets:
+        for num, tweet in enumerate(user_tweets):
             tweet.text = re.sub("\n", " ", tweet.text)
-            self.write_to_file(f'"{self.user} tweeted: {tweet.text}";\n')
-
-            if num_retrieved_tweets >= 320:
+            print(num, tweet.text)
+            self.write_to_file(f"Tweet number {num}: \n")
+            if self.limit >= 320:
                 print("No more tweets")
-                print("Sleep for 1000ms....")
-                num_retrieved_tweets = 0
-                time.sleep(10000)
+                print("Sleep for 15min....")
+                self.limit = 0
+                time.sleep(900)
                 continue
             else:
                 try:
-                    replies = self.api.search(q=f"@{self.user}",
-                                              since_id=tweet.id, pages=2)
-                    num_retrieved_tweets += len(replies)
-
-                    print(f"Найдено ответов в цикле: {len(replies)}")
-                    print(f"Счетчик твитов: {num_retrieved_tweets}")
-
-                    for reply in replies:
+                    # replies = self.api.search(q=f"@{self.user}",
+                    #                           since_id=tweet.id)
+                    status = tweepy.Cursor(self.api.search,
+                                           q=f"@{self.user}",
+                                           since_id=tweet.id,
+                                           rpp=self.num_of_repl,
+                                           pages=1
+                                           ).items()
+                    self.limit += self.num_of_repl
+                    for reply in status:
                         if reply.in_reply_to_status_id == tweet.id:
                             reply_user = str(reply.user.screen_name).strip()
-                            self.write_to_file(f'"{reply_user} replied {reply.text}";\n')
-                            print("----------Нашел ответ!----------")
+                            self.write_to_file(f'"{self.user} tweeted: {tweet.text}";\n')
+                            self.write_to_file(f'"{reply_user} replied: {reply.text}";\n')
+                            self.write_to_file("-----------------------\n")
+                            break
+                            print("----------Нашел ответ!----------\n")
+                            print("Ищу ответ на следующий твит\n")
 
-                    self.write_to_file("-----------------------\n")
                 except tweepy.TweepError as error:
                     logging.exception(error)
-                    time.sleep(1000)
+                    time.sleep(900)
                     continue
 
     def write_to_file(self, text):
@@ -80,9 +91,15 @@ class TwitterAccount():
 
 
 if __name__ == '__main__':
-    twitter = TwitterAccount(user="wylsacom")
-    api = twitter.get_api()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--username", help="Choose the user whose tweets to download")
+    args = parser.parse_args()
+    if args.username:
+        print(f"Searching {args.username} tweets")
+        TwitterAccount(user=args.username)
+    else:
+        TwitterAccount()
 
-    streamListener = StreamListener()
-    stream = tweepy.Stream(auth=api.auth, listener=streamListener)
-    stream.filter(follow=["284168384"])
+    # streamListener = StreamListener()
+    # stream = tweepy.Stream(auth=api.auth, listener=streamListener)
+    # stream.filter(follow=["284168384"])

@@ -13,9 +13,25 @@ import config
 class StreamListener(tweepy.StreamListener):
     def on_status(self, status):
         tw = TwitterAccount()
-        tw.write_to_file(f"{status.text}\n")
+        api = tw.get_api()
+        if status.in_reply_to_status_id:
+            try:
+                tweet = api.get_status(id=status.in_reply_to_status_id,
+                                       tweet_mode='extended')
+                origin_tweet = re.sub("\n", "", tweet.full_text)
+                reply_tweet = re.sub("\n", "", status.text)
+
+                # Write tweets to the tweets file
+                text_to_write = f'{origin_tweet} -|- {reply_tweet}\n'
+                tw.write_to_file(text=text_to_write,
+                                 file='data/all_tweets.csv')
+                print(f"{text_to_write}\n")
+            except tweepy.TweepError as error:
+                print(error)
 
     def on_error(self, status_code):
+        print("")
+        print(status_code)
         if status_code == 420:
             return False
 
@@ -26,8 +42,6 @@ class TwitterAccount():
         self.num_of_tweets = 10
         self.num_of_repl = 20
         self.limit = 0
-        self.get_api()
-        self.get_tweets()
 
     def get_api(self):
         try:
@@ -43,6 +57,8 @@ class TwitterAccount():
             logging.exception(exception)
         return self.api
 
+    # TODO: search some users tweets and get their ids
+    # Using that ids search for tweets using 'api.get_status(id=) method'
     def get_tweets(self):
         user_tweets = self.api.user_timeline(id=self.user,
                                              count=self.num_of_tweets,
@@ -85,21 +101,31 @@ class TwitterAccount():
                     time.sleep(900)
                     continue
 
-    def write_to_file(self, text):
-        with open(f'data/{self.user}.csv', 'a') as file:
+    def write_to_file(self, text, file="data.csv"):
+        file_name = f'data/{self.user}.csv'
+        with open(file, 'a') as file:
             file.write(text)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--username", help="Choose the user whose tweets to download")
-    args = parser.parse_args()
-    if args.username:
-        print(f"Searching {args.username} tweets")
-        TwitterAccount(user=args.username)
-    else:
-        TwitterAccount()
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--username", help="Choose the user whose tweets to download")
+    # args = parser.parse_args()
+    # if args.username:
+    #     print(f"Searching {args.username} tweets")
+        # tweeter = TwitterAccount(user=args.username)
+        # twitter.get_api()
+        # twitter.get_tweets()
+    # else:
+    #     TwitterAccount()
 
-    # streamListener = StreamListener()
-    # stream = tweepy.Stream(auth=api.auth, listener=streamListener)
-    # stream.filter(follow=["284168384"])
+    twitter = TwitterAccount()
+    api = twitter.get_api()
+    streamListener = StreamListener()
+    stream = tweepy.Stream(auth=api.auth,
+                           listener=streamListener,
+                           tweet_mode='extended')
+
+    stream.filter(track=["#UCL", "#UEFA", "#FIFA", "#Qualification"],
+                  languages=["en"],
+                  async=True)

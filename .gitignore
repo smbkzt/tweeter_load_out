@@ -3,3 +3,5 @@ myenv
 setup
 config.py
 *.csv
+.DS_Store
+data/

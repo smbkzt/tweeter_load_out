@@ -1,3 +1,6 @@
+#!/Library/Frameworks/Python.framework/Versions/3.6/bin/python3.6
+# # -*- coding: UTF-8 -*-
+
 import sys
 import re
 import argparse
@@ -11,26 +14,42 @@ import config
 
 
 class StreamListener(tweepy.StreamListener):
+    def __init__(self):
+        self.tw = TwitterAccount()
+        self.api = self.tw.get_api()
+
     def on_status(self, status):
-        tw = TwitterAccount()
-        api = tw.get_api()
         if status.in_reply_to_status_id:
             try:
-                tweet = api.get_status(id=status.in_reply_to_status_id,
-                                       tweet_mode='extended')
-                origin_tweet = re.sub("\n", "", tweet.full_text)
-                reply_tweet = re.sub("\n", "", status.text)
+                self.get_tweet(status, True)
+            except AttributeError as error:
+                self.get_tweet(status, False)
+
+    def get_tweet(self, status, is_extended):
+        try:
+            if is_extended:
+                full_text_repl_tw = status.extended_tweet.get('full_text')
+                tweet = self.api.get_status(id=status.in_reply_to_status_id,
+                                            tweet_mode='extended')
+                tweet_text = tweet.full_text
+            else:
+                full_text_repl_tw = status.text
+                tweet = self.api.get_status(id=status.in_reply_to_status_id)
+                tweet_text = tweet.text
+
+            if not tweet.in_reply_to_status_id:
+                origin_tweet = re.sub("\n", " ", tweet_text)
+                reply_tweet = re.sub("\n", " ", full_text_repl_tw)
 
                 # Write tweets to the tweets file
-                text_to_write = f'{origin_tweet} -|- {reply_tweet}\n'
-                tw.write_to_file(text=text_to_write,
+                text_to_write = f'{origin_tweet} ⇤⇥ {reply_tweet}\n'
+                self.tw.write_to_file(text=text_to_write,
                                  file='data/all_tweets.csv')
                 print(f"{text_to_write}\n")
-            except tweepy.TweepError as error:
+        except tweepy.TweepError as error:
                 print(error)
 
     def on_error(self, status_code):
-        print("")
         print(status_code)
         if status_code == 420:
             return False
@@ -126,6 +145,6 @@ if __name__ == '__main__':
                            listener=streamListener,
                            tweet_mode='extended')
 
-    stream.filter(track=["#UCL", "#UEFA", "#FIFA", "#Qualification"],
+    stream.filter(track=["agree", "#agree", "disagree", "#disagree"],
                   languages=["en"],
                   async=True)

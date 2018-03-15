@@ -1,11 +1,12 @@
 #!/Library/Frameworks/Python.framework/Versions/3.6/bin/python3.6
 # # -*- coding: UTF-8 -*-
 
-import sys
 import re
-import argparse
+import sys
 import time
+import argparse
 import logging
+import string
 
 import tweepy
 from tweepy import OAuthHandler
@@ -42,15 +43,25 @@ class StreamListener(tweepy.StreamListener):
                 reply_tweet = re.sub("\n", " ", full_text_repl_tw)
 
                 # Write tweets to the tweets file
-                text_to_write = f'{origin_tweet} ⇤⇥ {reply_tweet}\n'
+                text_to_write = f'{origin_tweet} < - > {reply_tweet}\n'
                 self.tw.write_to_file(text=text_to_write,
-                                 file='data/all_tweets.csv')
-                print(f"{text_to_write}\n")
+                                      file='data/all_tweets.csv')
+
+                exclude = set(string.punctuation)
+                text_without_puncts = ''.join(ch for ch in reply_tweet
+                                              if ch not in exclude).lower()
+                if "dont agree" in text_without_puncts or "disagree" in text_without_puncts:
+                    self.tw.write_to_file(text=text_to_write,
+                                          file='data/disagreed.plarity')
+                    print(f"{text_to_write}\n")
+                else:
+                    self.tw.write_to_file(text=text_to_write,
+                                          file='data/agreed.plarity')
         except tweepy.TweepError as error:
                 print(error)
 
     def on_error(self, status_code):
-        print(status_code)
+        print("Got an error: ", status_code)
         if status_code == 420:
             return False
 
@@ -145,6 +156,7 @@ if __name__ == '__main__':
                            listener=streamListener,
                            tweet_mode='extended')
 
-    stream.filter(track=["agree", "#agree", "disagree", "#disagree"],
+    stream.filter(track=["disagree", "#disagree", "don't agree"],
+                  # "agree", "#agree", "couldn't agree more"],
                   languages=["en"],
                   async=True)

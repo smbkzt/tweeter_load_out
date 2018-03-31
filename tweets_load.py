@@ -21,7 +21,7 @@ class StreamListener(tweepy.StreamListener):
         if status.in_reply_to_status_id:
             try:
                 self.get_tweet(status, True)
-            except AttributeError as error:
+            except AttributeError:
                 self.get_tweet(status, False)
 
     def get_tweet(self, status, is_extended):
@@ -48,7 +48,16 @@ class StreamListener(tweepy.StreamListener):
                 exclude = set(string.punctuation)
                 text_without_puncts = ''.join(ch for ch in reply_tweet
                                               if ch not in exclude).lower()
-                if "dont agree" in text_without_puncts or "disagree" in text_without_puncts:
+                print("_____", text_without_puncts)
+                agree = ["cant agree with you more", "cant agree more",
+                         "couldnt agree more", "couldnt agree with you more"]
+                disagree = ["dont agree", "dont agree",
+                            "cant agree with", "cant agree"]
+                if any(i in text_without_puncts for i in agree):
+                    self.tw.write_to_file(text=text_to_write,
+                                          file='data/agreed.plarity')
+                    print(f"{text_to_write}\n")
+                elif any(i in text_without_puncts for i in disagree):
                     self.tw.write_to_file(text=text_to_write,
                                           file='data/disagreed.plarity')
                     print(f"{text_to_write}\n")
@@ -56,7 +65,7 @@ class StreamListener(tweepy.StreamListener):
                     self.tw.write_to_file(text=text_to_write,
                                           file='data/agreed.plarity')
         except tweepy.TweepError as error:
-                print(error)
+            print(error)
 
     def on_error(self, status_code):
         print("Got an error: ", status_code)
@@ -117,12 +126,14 @@ class TwitterAccount():
                     for reply in status:
                         if reply.in_reply_to_status_id == tweet.id:
                             reply_user = str(reply.user.screen_name).strip()
-                            self.write_to_file(f'"{self.user} tweeted: {tweet.text}";\n')
-                            self.write_to_file(f'"{reply_user} replied: {reply.text}";\n')
+                            self.write_to_file(
+                                f'"{self.user} tweeted: {tweet.text}";\n')
+                            self.write_to_file(
+                                f'"{reply_user} replied: {reply.text}";\n')
                             self.write_to_file("-----------------------\n")
-                            break
                             print("----------Нашел ответ!----------\n")
                             print("Ищу ответ на следующий твит\n")
+                            break
 
                 except tweepy.TweepError as error:
                     logging.exception(error)
@@ -130,14 +141,14 @@ class TwitterAccount():
                     continue
 
     def write_to_file(self, text, file="data.csv"):
-        file_name = f'data/{self.user}.csv'
         with open(file, 'a') as file:
             file.write(text)
 
 
 if __name__ == '__main__':
     # parser = argparse.ArgumentParser()
-    # parser.add_argument("--username", help="Choose the user whose tweets to download")
+    # parser.add_argument("--username",
+    # help="Choose the user whose tweets to download")
     # args = parser.parse_args()
     # if args.username:
     #     print(f"Searching {args.username} tweets")
@@ -154,7 +165,10 @@ if __name__ == '__main__':
                            listener=streamListener,
                            tweet_mode='extended')
 
-    stream.filter(track=["disagree", "#disagree", "don't agree"],
+    stream.filter(track=["disagree", "#disagree", "don't agree",
+                         "can't agree with",
+                         "cant agree with", "couldn't agree with",
+                         "couldnt agree with"],
                   # "agree", "#agree", "couldn't agree more"],
                   languages=["en"],
                   async=True)
